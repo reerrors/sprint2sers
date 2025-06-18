@@ -55,6 +55,7 @@ graph TD
     
     C -- "Lê/Escreve dados" --> E
     D -- "Atualiza dados (a cada 1s)" --> E
+```
 
 ---
 
