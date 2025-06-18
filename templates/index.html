@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle de Energia</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { 
+            font-family: 'Roboto', sans-serif; 
+            background-color: #f0f2f5; 
+            color: #000;
+            margin: 0; 
+            padding: 0;
+        }
+        .container { max-width: 1200px; margin: auto; padding: 20px; }
+        h1 { text-align: center; color: #000; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .card { background-color: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 20px; text-align: center; }
+        .card h4 { margin-top: 0; color: #000; font-size: 1.2em; } /* Alterado para h4 como no seu código */
+        .value { font-size: 2.5em; font-weight: bold; margin: 10px 0; }
+        .consumption { color: #d32f2f; }
+        .generation { color: #f57c00; }
+        .grid { color: #546e7a; }
+        #battery-progress { width: 100%; background-color: #e0e0e0; border-radius: 5px; }
+        #battery-bar { width: 0%; height: 30px; background-color: #43a047; text-align: center; line-height: 30px; color: white; border-radius: 5px; transition: width 0.5s; }
+        .alert { padding: 15px; background-color: #c62828; color: white; border-radius: 8px; margin-top: 20px; text-align: center; font-weight: bold; display: none; }
+        ul { list-style: none; padding: 0;}
+        li { background-color: #f5f5f5; border: 1px solid #e0e0e0; margin-bottom: 8px; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;}
+        .device-name { font-weight: bold; }
+        
+        /* --- MUDANÇAS NOS BOTÕES --- */
+        .device-controls button {
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            color: white;
+            font-weight: bold;
+            transition: all 0.2s ease-in-out;
+            min-width: 65px; /* 1. Garante que os botões tenham o mesmo tamanho */
+            text-align: center;
+        }
+        .device-controls button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        /* 2. Novas cores em tons de cinza */
+        .btn-on {
+            background-color: #616161; /* Cinza escuro */
+        }
+        .btn-on:hover:not(:disabled) {
+            background-color: #424242; /* Cinza mais escuro no hover */
+        }
+
+        .btn-off {
+            background-color: #9E9E9E; /* Cinza médio */
+        }
+        .btn-off:hover:not(:disabled) {
+            background-color: #757575; /* Cinza médio mais escuro no hover */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PAINEL DE CONTROLE ENERGÉTICO</h1>
+        <div class="dashboard">
+            <div class="card">
+                <h4>🔋 NÍVEL DE BATERIA</h4>
+                <div id="battery-progress">
+                    <div id="battery-bar">0%</div>
+                </div>
+                <p>Estado: <strong id="battery-state">--</strong></p>
+            </div>
+            <div class="card">
+                <h4>🔌 CONSUMO</h4>
+                <p class="value consumption"><span id="consumption-value">0</span> W</p>
+            </div>
+            <div class="card">
+                <h4>☀️ GERAÇÃO SOLAR</h4>
+                <p class="value generation"><span id="generation-value">0</span> W</p>
+            </div>
+            <div class="card">
+                <h4>🏢 USO DA REDE</h4>
+                <p class="value grid"><span id="grid-value">0</span> W</p>
+            </div>
+        </div>
+        <div class="card" style="margin-top: 20px;">
+            <h4>CONTROLE DE DISPOSITIVOS</h4>
+            <ul id="device-list"></ul>
+        </div>
+        <div id="alert-box" class="alert"></div>
+    </div>
+
+    <script>
+        function sendCommand(deviceId, action) {
+            fetch(`/comando/${deviceId}/${action}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Comando enviado:', data);
+                updateDashboard();
+            })
+            .catch(error => console.error('Erro ao enviar comando:', error));
+        }
+
+        function updateDashboard() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('consumption-value').textContent = data.consumo_casa.toFixed(0);
+                    document.getElementById('generation-value').textContent = data.geracao_solar.toFixed(0);
+                    document.getElementById('grid-value').textContent = data.consumo_rede.toFixed(0);
+                    
+                    const batteryPercentage = data.bateria_porcentagem;
+                    const batteryBar = document.getElementById('battery-bar');
+                    batteryBar.style.width = batteryPercentage + '%';
+                    batteryBar.textContent = batteryPercentage.toFixed(1) + '%';
+                    
+                    if (batteryPercentage < 20) {
+                        batteryBar.style.backgroundColor = '#d32f2f'; // Vermelho
+                    } else if (batteryPercentage < 50) {
+                        batteryBar.style.backgroundColor = '#ffa000'; // Amarelo
+                    } else {
+                        batteryBar.style.backgroundColor = '#43a047'; // Verde
+                    }
+
+                    document.getElementById('battery-state').textContent = data.bateria_estado;
+
+                    const deviceList = document.getElementById('device-list');
+                    deviceList.innerHTML = '';
+                    data.dispositivos.forEach(device => {
+                        const li = document.createElement('li');
+                        // --- 3. MUDANÇA NO TEXTO DOS BOTÕES ---
+                        li.innerHTML = `
+                            <span class="device-name">${device.nome}</span>
+                            <div class="device-controls">
+                                <button class="btn-on" onclick="sendCommand('${device.id}', 'ligar')" ${device.esta_ligado ? 'disabled' : ''}>ON</button>
+                                <button class="btn-off" onclick="sendCommand('${device.id}', 'desligar')" ${!device.esta_ligado ? 'disabled' : ''}>OFF</button>
+                            </div>
+                        `;
+                        deviceList.appendChild(li);
+                    });
+
+                    const alertBox = document.getElementById('alert-box');
+                    if (data.alerta) {
+                        alertBox.textContent = '🚨 ' + data.alerta;
+                        alertBox.style.display = 'block';
+                    } else {
+                        alertBox.style.display = 'none';
+                    }
+                })
+                .catch(error => console.error('Erro ao buscar dados:', error));
+        }
+
+        setInterval(updateDashboard, 2000);
+        window.onload = updateDashboard;
+    </script>
+</body>
+</html>
