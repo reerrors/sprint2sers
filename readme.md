@@ -58,7 +58,7 @@ graph TD
 
 ---
 
-## 📁 Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
 /SPRINT2SERS/
